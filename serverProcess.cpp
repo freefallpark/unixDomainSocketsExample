@@ -1,0 +1,124 @@
+// Standard Includes:
+#include <iostream>
+#include <unistd.h>
+
+// UDS Includes:
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/types.h>
+#include <mutex>
+
+// Defines:
+#define SOCK_PATH "tpf_unix_sock.server"
+#define DATA  "Hello from Server"
+
+using namespace std;
+
+int main() {
+    // Var Instances:
+    int server_sock, client_sock;
+    ssize_t rc, bytes_rec = 0;
+    socklen_t len;
+    struct sockaddr_un server_sockaddr;
+    struct sockaddr_un client_sockaddr;
+    char buf[256];
+    int backlog = 10;
+    // Memsetting 0's
+    memset(&server_sockaddr, 0, sizeof(struct sockaddr_un));
+    memset(&client_sockaddr, 0, sizeof(struct sockaddr_un));
+    memset(buf,0, 256);
+
+    // Create Server Socket:
+    server_sock = socket(AF_UNIX, SOCK_STREAM,0);
+    if(server_sock == -1){
+        cout << "Error Creating Server Socket!"<<endl;
+        return 1;
+    }
+
+    // Setup UNIX sockaddr structure with AF_UNIX
+    server_sockaddr.sun_family = AF_UNIX;
+
+    //Give filepath to bind to
+    strcpy(server_sockaddr.sun_path,SOCK_PATH);
+    len = sizeof(server_sockaddr);
+
+    //Unlink file so bind will succeed:
+    unlink(SOCK_PATH);
+
+    //Bind to the file:
+    rc = bind(server_sock,(struct sockaddr*)&server_sockaddr,len);
+    if(rc==-1){
+        cout<< "Couldn't Bind File!"<<endl;
+        close(server_sock);
+        return 1;
+    }
+
+
+    //Listen for Clients:
+    rc = listen(server_sock, backlog);
+    if(rc==-1){
+        cout<< "Couldn't Bind File!"<<endl;
+        close(server_sock);
+        return 1;
+    }
+    cout << "Server Listening for Clients..."<<endl;
+
+
+    //Accept an incomming Connection
+
+    client_sock = accept(server_sock, (struct sockaddr *)&client_sockaddr,&len);
+    if(client_sock == -1){
+        cout << "Error Accepting Client Socket"<<endl;
+        close(server_sock);
+        close(client_sock);
+        return 1;
+    }
+
+    //Get Client Peer name
+    len = sizeof(client_sock);
+    rc = getpeername(client_sock,(struct sockaddr*)&client_sockaddr,&len);
+    if(rc == -1){
+        cout << "Error Getting Peer Name!"<<endl;
+        close(server_sock);
+        close(client_sock);
+        return 1;
+    }
+    else{
+        cout << "Client socket filepath: " << client_sockaddr.sun_path <<endl;
+    }
+
+    // Read Client Data:
+    cout << "Waiting to read ..."<<endl;
+    bytes_rec = recv(client_sock,buf, sizeof(buf),0);
+    if(bytes_rec == -1){
+        cout << "Error Reading Client"<<endl;
+        close(server_sock);
+        close(client_sock);
+        return 1;
+    }
+    else{
+        cout << "Data Received: " << buf <<endl;
+    }
+
+    //Send Data back to Client Socket:
+    memset(buf, 0, 256);
+    strcpy(buf, DATA);
+    cout << "Sending Data to Client..." << endl;
+    rc = send(client_sock, buf, strlen(buf),0);
+    if(rc == -1){
+        cout << "Error Sending Data to Client..." << endl;
+        close(server_sock);
+        close(client_sock);
+        return 1;
+    }
+    else{
+        cout << "Data Sent to Client..." << endl;
+    }
+
+
+    //Terminate:
+    close(client_sock);
+    close(server_sock);
+
+    return 0;
+}
