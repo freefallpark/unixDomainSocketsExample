@@ -7,10 +7,10 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include "converters.h"
 
 #define SERVER_PATH "tpf_unix_sock.server"
 #define CLIENT_PATH "tpf_unix_sock.client"
-#define DATA "Hello from client"
 
 using namespace std;
 int main() {
@@ -20,7 +20,6 @@ int main() {
     socklen_t len;
     struct sockaddr_un server_sockaddr;
     struct sockaddr_un client_sockaddr;
-    char buf[256];
 
     //Memsetting 0's
     memset(&server_sockaddr,0, sizeof(struct sockaddr_un));
@@ -60,10 +59,36 @@ int main() {
         return 1;
     }
 
+    //Prepare data for send:
+    unsigned char errorCode = 0x00;
+    unsigned char tmpBuf[3];
+    unsigned char buf[256];
+    memset(buf, '\0', sizeof(buf));
+    memset(tmpBuf, '\0', sizeof(tmpBuf));
+    float x, y, z, r, p, yaw;
+    int converter = 1000;
+    int intArray[6]; // x = [0], y = [1] z = [2], r = [3], p = [4], yaw = [5]
+    // Normally these values are determined by the Face Pose Client:
+    x = 12.3456; y =  5.4321; z   = 123.4567;
+    r = 23.4567; p = 10.9876; yaw =   2.3456;
+    float floatArray[6] = {x,y,z,r,p,yaw};
+    buf[0] = errorCode;
+    //Package data into one buffer and send:
+    for(int k = 1; k<=16;k=k+3){
+        floatArray[((k+2)/3)-1] = floatArray[((k+2)/3)-1]*(float)converter;
+        intArray[((k+2)/3)-1] = (int)floatArray[((k+2)/3)-1];
+        rightShift24(intArray[((k+2)/3)-1],tmpBuf);
+        for(int j = 0; j<3; j++){
+            buf[k+j]= tmpBuf[j];
+        }
+    }
+
+
+
     // Send data to server:
-    strcpy(buf,DATA);
     cout << "Sending Data to Server ..."<<endl;
-    rc = send(client_sock,buf, strlen(buf),0);
+    rc = send(client_sock,buf, sizeof(buf),0);
+
     if(rc == -1){
         cout << "Send Error..."<<endl;
         close(client_sock);

@@ -3,5 +3,9 @@ project(unixDomainSocketPractice)
 
 set(CMAKE_CXX_STANDARD 11)
 
-add_executable(serverProcess serverProcess.cpp)
-add_executable(clientProcess clientProcess.cpp)
+include_directories(common)
+
+add_executable(serverProcess serverProcess.cpp
+        common/converters.cpp           common/converters.h)
+add_executable(clientProcess clientProcess.cpp
+        common/converters.cpp           common/converters.h)
