@@ -1,0 +1,12 @@
+//
+// Created by pkyle on 11/1/22.
+//
+
+#ifndef UNIXDOMAINSOCKETPRACTICE_CONNECTION_H
+#define UNIXDOMAINSOCKETPRACTICE_CONNECTION_H
+
+// Defines:
+#define PATH "/tmp/temp.server"
+#define BUFFSIZE 12
+
+#endif //UNIXDOMAINSOCKETPRACTICE_CONNECTION_H

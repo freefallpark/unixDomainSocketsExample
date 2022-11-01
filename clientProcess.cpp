@@ -10,144 +10,63 @@
 #include "converters.h"
 #include <csignal>
 
-#define PATH "server"
-#define CLIENT_PATH "tpf_unix_sock.client"
+#include "connection.h"
 
 using namespace std;
 volatile sig_atomic_t stop;
 void inthand(int signum){
     stop = 1;
 }
-int main() {
+int main(int argc, char *argv[]) {
     //Setup ctrl + c Stop in while loop...
     signal(SIGINT, inthand);
+    sockaddr_un  addr{};
+    size_t ret;
+    int data_socket;
+    char buffer[BUFFSIZE];
 
-    //create socket to send to...
-    int sock;
-    sockaddr_un client{};
-    char buffer[256];
-    if((sock = socket(AF_UNIX,SOCK_DGRAM,0))<0){
-        perror("opening datagram socket");
+    //Create local socket:
+    if((data_socket = socket(AF_UNIX,SOCK_SEQPACKET,0))<0){
+        perror("Error during Data_socket Creation");
         exit(EXIT_FAILURE);
     }
 
-    //build Addr.
-    client.sun_family = AF_UNIX;
-    strcpy(client.sun_path, PATH);
+    //memset 0's for portability:
+    memset(&addr,0,sizeof(addr));
 
-    //while loop for send/recieve;
-    buffer[0] = 1;
-    while(!stop){
-        // Send Data:
-        if(send(sock,buffer,256,0)) {
-            perror("sending datagram message");
-        }
-        buffer[0]++;
-        usleep(500000);
+    //Connect Socket to address:
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path,PATH, sizeof(addr.sun_path)-1);
+    if((ret = connect(data_socket,(const struct sockaddr*) &addr, sizeof(addr)))<0){
+        fprintf(stderr,"The Server is down.\n");
+        exit(EXIT_FAILURE);
     }
 
+    // Send Arguments:
+    for(int i=1;i<argc; i++){
+        if((ret = write(data_socket,argv[i], strlen(argv[i])+1))<0){
+            perror("Error during Write");
+            break;
+        }
+    }
 
+    //Request Result:
+    strcpy(buffer,"END");
+    if((ret = write(data_socket,buffer, strlen(buffer)+1))<0){
+        perror("Error during Write");
+        exit(EXIT_FAILURE);
+    }
 
-    return 0;
+    //Receieve Result:
+    if(( ret = read(data_socket,buffer,sizeof(buffer)))<0){
+        perror("Error during read");
+        exit(EXIT_FAILURE);
+    }
+
+    buffer[sizeof(buffer)-1] = 0;
+
+    printf("Result = %s\n",buffer);
+
+    close(data_socket);
+    exit(EXIT_SUCCESS);
 }
-//// Var Instances:
-//int client_sock;
-//ssize_t rc;
-//socklen_t len;
-//struct sockaddr_un server_sockaddr;
-//struct sockaddr_un client_sockaddr;
-//
-////Memsetting 0's
-//memset(&server_sockaddr,0, sizeof(struct sockaddr_un));
-//memset(&client_sockaddr,0, sizeof(struct sockaddr_un));
-//
-//// Create Socket Stream:
-//client_sock = socket(AF_UNIX,SOCK_STREAM,0);
-//if(client_sock == -1){
-//cout << "Failed to create Client Socket" << endl;
-//return 1;
-//}
-//
-////Setup client Socket Addr struct
-//client_sockaddr.sun_family = AF_UNIX;
-//strcpy(client_sockaddr.sun_path, CLIENT_PATH);
-//len = sizeof(client_sockaddr);
-//
-//// Unlink File:
-//unlink(CLIENT_PATH);
-//
-//// Bind Path:
-//rc = bind(client_sock, (struct sockaddr*)&client_sockaddr,len);
-//if(rc == -1){
-//cout << "Failed to Bind Client Socket"<<endl;
-//close(client_sock);
-//}
-//
-////Setup Sockaddr struct for server:
-//server_sockaddr.sun_family = AF_UNIX;
-//strcpy(server_sockaddr.sun_path, SERVER_PATH);
-//
-////Connect to Server
-//rc = connect(client_sock, (struct sockaddr*)&server_sockaddr,len);
-//if(rc == -1){
-//cout << "Error Connecting to Server"<<endl;
-//close(client_sock);
-//return 1;
-//}
-//
-////Prepare data for send:
-//unsigned char errorCode = 0x00;
-//unsigned char tmpBuf[3];
-//unsigned char buf[256];
-//memset(buf, '\0', sizeof(buf));
-//memset(tmpBuf, '\0', sizeof(tmpBuf));
-//float x, y, z, r, p, yaw;
-//int converter = 1000;
-//int intArray[6]; // x = [0], y = [1] z = [2], r = [3], p = [4], yaw = [5]
-//// Normally these values are determined by the Face Pose Client:
-//x = 12.3456; y =  5.4321; z   = 123.4567;
-//r = 23.4567; p = 10.9876; yaw =   2.3456;
-//float floatArray[6] = {x,y,z,r,p,yaw};
-//buf[0] = errorCode;
-//int count = 0;
-//while(!stop){
-////Package data into one buffer and send:
-//for(int k = 1; k<=16;k=k+3){
-//floatArray[((k+2)/3)-1] = floatArray[((k+2)/3)-1]*(float)converter;
-//intArray[((k+2)/3)-1] = (int)floatArray[((k+2)/3)-1];
-//rightShift24(intArray[((k+2)/3)-1],tmpBuf);
-//for(int j = 0; j<3; j++){
-//buf[k+j]= tmpBuf[j];
-//}
-//}
-//
-//// Send data to server:
-//rc = send(client_sock,buf, sizeof(buf),0);
-//cout << '\r' << count << flush;
-//if(rc == -1){
-//cout << "Send Error..."<<endl;
-//close(client_sock);
-//return 1;
-//}
-//else{
-//rc = recv(client_sock,buf,sizeof(buf), 0);
-//}
-//count++;
-//usleep(500000);
-//}
-//
-////Read Data from server:
-//cout << "Waiting to receive Data from server..."<<endl;
-//rc = recv(client_sock, buf,sizeof(buf),0);
-//if(rc == -1){
-//cout << "Error Receiving Data..."<<endl;
-//close(client_sock);
-//return 1;
-//}
-//else{
-//cout<< "Data Recieved from Server: "<< buf<<endl;
-//}
-//
-//
-////Terminate
-//close(client_sock);
