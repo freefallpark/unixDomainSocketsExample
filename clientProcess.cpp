@@ -8,12 +8,19 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include "converters.h"
+#include <csignal>
 
 #define SERVER_PATH "tpf_unix_sock.server"
 #define CLIENT_PATH "tpf_unix_sock.client"
 
 using namespace std;
+volatile sig_atomic_t stop;
+void inthand(int signum){
+    stop = 1;
+}
 int main() {
+    signal(SIGINT, inthand);
+
     // Var Instances:
     int client_sock;
     ssize_t rc;
@@ -73,29 +80,31 @@ int main() {
     r = 23.4567; p = 10.9876; yaw =   2.3456;
     float floatArray[6] = {x,y,z,r,p,yaw};
     buf[0] = errorCode;
-    //Package data into one buffer and send:
-    for(int k = 1; k<=16;k=k+3){
-        floatArray[((k+2)/3)-1] = floatArray[((k+2)/3)-1]*(float)converter;
-        intArray[((k+2)/3)-1] = (int)floatArray[((k+2)/3)-1];
-        rightShift24(intArray[((k+2)/3)-1],tmpBuf);
-        for(int j = 0; j<3; j++){
-            buf[k+j]= tmpBuf[j];
+    int count = 0;
+    while(!stop){
+        //Package data into one buffer and send:
+        for(int k = 1; k<=16;k=k+3){
+            floatArray[((k+2)/3)-1] = floatArray[((k+2)/3)-1]*(float)converter;
+            intArray[((k+2)/3)-1] = (int)floatArray[((k+2)/3)-1];
+            rightShift24(intArray[((k+2)/3)-1],tmpBuf);
+            for(int j = 0; j<3; j++){
+                buf[k+j]= tmpBuf[j];
+            }
         }
-    }
 
-
-
-    // Send data to server:
-    cout << "Sending Data to Server ..."<<endl;
-    rc = send(client_sock,buf, sizeof(buf),0);
-
-    if(rc == -1){
-        cout << "Send Error..."<<endl;
-        close(client_sock);
-        return 1;
-    }
-    else{
-        cout<<"Data Sent!"<<endl;
+        // Send data to server:
+        rc = send(client_sock,buf, sizeof(buf),0);
+        cout << '\r' << count << flush;
+        if(rc == -1){
+            cout << "Send Error..."<<endl;
+            close(client_sock);
+            return 1;
+        }
+        else{
+            rc = recv(client_sock,buf,sizeof(buf), 0);
+        }
+        count++;
+        usleep(500000);
     }
 
     //Read Data from server:

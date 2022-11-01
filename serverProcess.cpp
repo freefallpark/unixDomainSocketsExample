@@ -105,8 +105,11 @@ int main() {
     int fpcError;
 
     while(!stop){
-        cout << "Waiting to read ..."<<endl;
-        bytes_rec = recv(client_sock,buf, sizeof(buf),0);
+        // poll the FD to wait for the correct number of bytes:
+
+        //
+//        select(client_sock,)
+        bytes_rec = recv(client_sock,buf, 256,0);
 
         if(bytes_rec == -1){
             cout << "Error Reading Client"<<endl;
@@ -114,7 +117,7 @@ int main() {
             close(client_sock);
             return 1;
         }
-        else if(bytes_rec == 18){
+        else{
             if (!buf[0]){ // No Errors recieved!
                 //We expect buffer: [char errorCode[1], char x[3], char y[3], char z[3], char r[3], char p[3], char yaw[3]]
                 for(int i = 1; i<=16;i= i+3){
@@ -124,13 +127,15 @@ int main() {
                     intArray[(i+3)/3-1] = leftShift24(tmpBuf);
                     cout << intArray[(i+3)/3-1]<< '\t';
                 }
+                memset(buf,'\0',sizeof(buf));
+                rc = send(client_sock, buf, 256,0);
             }
             else{// errors comming from facePoseClient
                 cout << "Error from facePoseClient"<<endl;
             };
             cout << endl;
         }
-        usleep(500);
+        usleep(500000);
     }
 
 
