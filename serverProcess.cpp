@@ -52,49 +52,37 @@ int main() {
         perror("Error listening for connections");
         exit(EXIT_FAILURE);
     }
-    for(;;){
 
-        //Wait for incoming connections:
-        // This was in an infinite for loop on the man7.org example, but we only need one connection right now...
-        if((data_socket = accept(connection_socket, nullptr, nullptr))<0){
-            perror("Error during acceptance");
+    //Wait for incoming connections:
+    // This was in an infinite for loop on the man7.org example, but we only need one connection right now...
+    if((data_socket = accept(connection_socket, nullptr, nullptr))<0){
+        perror("Error during acceptance");
+        exit(EXIT_FAILURE);
+    }
+
+    result = 0;
+    while(!stop){
+        // Wait for next Data Packet...
+        if((ret = read(data_socket,buffer,sizeof(buffer)))<0){
+            perror("Error during Read");
             exit(EXIT_FAILURE);
         }
 
-        result = 0;
-        for(;;){
-            // Wait for next Data Packet...
-            if((ret=read(data_socket,buffer,sizeof(buffer)))<0){
-                perror("Error during Read");
-                exit(EXIT_FAILURE);
-            }
+        //ensure Buffer is 0 terminated:
+        buffer[sizeof(buffer)-1] = 0;
 
-            //ensure Buffer is 0 terminated:
-            buffer[sizeof(buffer)-1] = 0;
-
-            //Handle Commands...
-            if(!strncmp(buffer,"DOWN",sizeof(buffer))){
-                down_flag =1;
-                break;
-            }
-            if(!strncmp(buffer,"END",sizeof(buffer))){
-                break;
-            }
-            result += atoi(buffer);
-        }
-        //Send result:
-        sprintf(buffer,"%d",result);
-        if((ret = write(data_socket,buffer,sizeof(buffer)))<0){
-            perror("Error during write");
-            exit(EXIT_FAILURE);
-        }
-
-        //close socket
-        close(data_socket);
-        if(down_flag){
+        //Check if we need to leave loop:
+        if(!strncmp(buffer, "END",sizeof(buffer))){
             break;
         }
+        for(int i:buffer){
+            printf("%d\t",(int)buffer[i]);
+        }
+        cout << endl;
     }
+
+    //close socket
+    close(data_socket);
     close(connection_socket);
     unlink(PATH);
     printf("Server Shutdown Complete\n");
