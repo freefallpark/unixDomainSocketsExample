@@ -2,6 +2,8 @@
 #include <iostream>
 #include <unistd.h>
 #include "converters.h"
+#include <csignal>
+
 
 // UDS Includes:
 #include <sys/socket.h>
@@ -14,7 +16,13 @@
 
 using namespace std;
 
+volatile sig_atomic_t stop;
+void inthand(int signum){
+    stop =1;
+}
 int main() {
+    signal(SIGINT,inthand);
+
     // Var Instances:
     int server_sock, client_sock;
     ssize_t rc, bytes_rec = 0;
@@ -96,50 +104,36 @@ int main() {
     memset(tmpBuf,'\0',sizeof(tmpBuf));
     int fpcError;
 
-    cout << "Waiting to read ..."<<endl;
-    bytes_rec = recv(client_sock,buf, sizeof(buf),0);
-    if(bytes_rec == -1){
-        cout << "Error Reading Client"<<endl;
-        close(server_sock);
-        close(client_sock);
-        return 1;
-    }
-    else{
-        if (!buf[0]){ // No Errors recieved!
-            //We expect buffer: [char errorCode[1], char x[3], char y[3], char z[3], char r[3], char p[3], char yaw[3]]
-            for(int i = 1; i<=16;i= i+3){
-                for(int j = 0; j<3; j++){
-                    tmpBuf[j] = buf[i+j];
-                }
-                intArray[(i+3)/3-1] = leftShift24(tmpBuf);
-                cout << intArray[(i+3)/3-1]<<endl;
-            }
+    while(!stop){
+        cout << "Waiting to read ..."<<endl;
+        bytes_rec = recv(client_sock,buf, sizeof(buf),0);
+
+        if(bytes_rec == -1){
+            cout << "Error Reading Client"<<endl;
+            close(server_sock);
+            close(client_sock);
+            return 1;
         }
-        else{// errors comming from facePoseClient
-            cout << "Error from facePoseClient"<<endl;
-        };
-
-
-//        iVal = leftShift24(buf);
-//        fVal = (float)iVal/(float)converter;
-//        cout << "Data Received: " << fVal <<endl;
+        else if(bytes_rec == 18){
+            if (!buf[0]){ // No Errors recieved!
+                //We expect buffer: [char errorCode[1], char x[3], char y[3], char z[3], char r[3], char p[3], char yaw[3]]
+                for(int i = 1; i<=16;i= i+3){
+                    for(int j = 0; j<3; j++){
+                        tmpBuf[j] = buf[i+j];
+                    }
+                    intArray[(i+3)/3-1] = leftShift24(tmpBuf);
+                    cout << intArray[(i+3)/3-1]<< '\t';
+                }
+            }
+            else{// errors comming from facePoseClient
+                cout << "Error from facePoseClient"<<endl;
+            };
+            cout << endl;
+        }
+        usleep(500);
     }
 
-//    //Send Data back to Client Socket:
-//    memset(buf, 0, sizeof(buf));
-//
-//
-//    cout << "Sending Data to Client..." << endl;
-//    rc = send(client_sock, buf, sizeof(buf),0);
-//    if(rc == -1){
-//        cout << "Error Sending Data to Client..." << endl;
-//        close(server_sock);
-//        close(client_sock);
-//        return 1;
-//    }
-//    else{
-//        cout << "Data Sent to Client..." << endl;
-//    }
+
 
 
     //Terminate:
