@@ -30,9 +30,8 @@ int main() {
     char buffer[256];
         memset(buffer, '\0', sizeof(buffer));
     sockaddr_un server{};
-    sockaddr_un client{};
     memset(&server,0, sizeof(server));
-        memset(&client,0, sizeof(client));
+
     // Get File Descriptor...
     if((sockfd = socket(AF_UNIX, SOCK_DGRAM,0))<0){
         perror("Socket Creation Failed");
@@ -53,8 +52,6 @@ int main() {
 
     //Enter While loop:
     size_t n;
-    socklen_t len;
-    len = sizeof(client);
 
     cout << "Entering server reading loop..."<<endl;
     while(!stop){
@@ -63,13 +60,7 @@ int main() {
             perror("Receiving datagram packet");
         }
         //Process the datagram packet
-        printf("Client: %d\t%d\t%d", buffer[0], buffer[1], buffer[2]);
-
-        //Send response:
-        if(sendto(sockfd, (const void *) MSG_CONFIRM, sizeof(MSG_CONFIRM), 0,
-                  reinterpret_cast<const sockaddr *>(&server), sizeof(struct sockaddr_un)) < 0){
-            perror("sending datagram msg");
-        }
+        printf("Client: %d\t", buffer[0]);
         usleep(500000);
     }
 
