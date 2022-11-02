@@ -7,6 +7,6 @@
 
 // Defines:
 #define PATH "/tmp/temp.server"
-#define BUFFSIZE 12
+#define BUFFSIZE 25
 
 #endif //UNIXDOMAINSOCKETPRACTICE_CONNECTION_H
