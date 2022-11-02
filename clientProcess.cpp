@@ -15,6 +15,8 @@ void inthand(int signum){
 }
 //
 int main(int argc, char *argv[]) {
+    //Setup ctrl + c Stop in while loop...
+    signal(SIGINT, inthand);
     // if Argument passed in is "1" we need to shutdown...git
     //TODO: need to atually figure out how to do this... this is a cheap go around... I'll just check to see if argument is '49' (if this is true, shut down the server...
     char argument[256];
@@ -22,11 +24,9 @@ int main(int argc, char *argv[]) {
     for (int i = 1; i < argc; i++){
         strcat(argument,argv[i]);
     }
-    //Setup ctrl + c Stop in while loop...
-    signal(SIGINT, inthand);
     sockaddr_un  addr{};
     size_t ret;
-    int data_socket;
+    int data_socket,downFlag;
     char buffer[BUFFSIZE];
     char bufferSent[BUFFSIZE];
     int bufCheck;
@@ -48,54 +48,55 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     srand(time(nullptr));
-    // Send Arguments:
+    // Shut Down Server Command!
     if(argument[0] == 49){
-        strcpy(buffer,"DOWN");
+        buffer[0] = 2;
         cout << "Sending Server Shutdown command"<<endl;
         if(write(data_socket,buffer, sizeof(buffer)+1)<0){
             perror("Error during Write");
         }
         stop = 1;
+        usleep(1000);
+        close(data_socket);
+        exit(EXIT_SUCCESS);
     }
     while(!stop){
-        //Generate Fake Data to Send across the Socket
-        for(int i = 0; i<sizeof(buffer)-1;i++){
-            int num = rand()%10+1;
-            buffer[i] = (char)num;
+        //Read Data from Server:
+        bzero(buffer,sizeof(buffer));
+        if(read(data_socket,buffer,sizeof(buffer))<0){
+        perror("Error during read");
+    }
+        if(buffer[0] == 2){//shutdown dawg!
+            downFlag = 2;
+            break;
         }
-        memcpy(bufferSent, buffer, sizeof(bufferSent));
-        //Write Data Across
+        //Check Data (for now that's just print):
+        for(char i:buffer){
+            printf("%d\t",(int)buffer[i]);
+        }
+        cout << endl;
+
+        //Write data back to server so it can validate it
         if(write(data_socket,buffer, sizeof(buffer))<0){
             perror("Error during Write");
         }
 
-        //Wait for Reply
-        if(read(data_socket,buffer,sizeof(buffer))<0){
-            perror("Error during read");
-        }
-        // Confirm what we sent is what they got...
-        for(int i = 0; i<sizeof(buffer);i++){
-            bufCheck = buffer[i]-bufferSent[i];
-            printf("%d\t",bufCheck);
-            if(bufCheck!=0){
-                cout <<"\nWARNING, data sent to Server was different that data recieved!"<<endl;
-                stop = 1;
-            }
-        }
-        cout << '\n';
 
         //Namaste, give that a break
         usleep(1000);
     }
     cout <<'\n';
-    //Request Send end command to server:
-    bzero(buffer,BUFFSIZE);
-
-    strcpy(buffer,"END");
-    if(write(data_socket,buffer, strlen(buffer)+1)<0){
-        perror("Error during Write");
-        exit(EXIT_FAILURE);
+    if(downFlag !=2){
+        //Inform Server, client is shutting down (but the server should stay up)
+        bzero(buffer,BUFFSIZE);
+        buffer[0] = 1;
+        if(write(data_socket,buffer, strlen(buffer)+1)<0){
+            perror("Error during Write");
+            exit(EXIT_FAILURE);
+        }
+        usleep(1000);
     }
+
 
     close(data_socket);
     exit(EXIT_SUCCESS);
