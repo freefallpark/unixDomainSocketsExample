@@ -1,13 +1,9 @@
 #include <iostream>
 #include <cstdio>
 #include <cstdlib>
-#include <cerrno>
-#include <cstring>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include "converters.h"
 #include <csignal>
 
 #include "connection.h"
@@ -17,7 +13,15 @@ volatile sig_atomic_t stop;
 void inthand(int signum){
     stop = 1;
 }
-int main() {
+//
+int main(int argc, char *argv[]) {
+    // if Argument passed in is "1" we need to shutdown...git
+    //TODO: need to atually figure out how to do this... this is a cheap go around... I'll just check to see if argument is '49' (if this is true, shut down the server...
+    char argument[256];
+    memset(argument,0,sizeof(argument));
+    for (int i = 1; i < argc; i++){
+        strcat(argument,argv[i]);
+    }
     //Setup ctrl + c Stop in while loop...
     signal(SIGINT, inthand);
     sockaddr_un  addr{};
@@ -43,14 +47,26 @@ int main() {
     }
     srand(time(nullptr));
     // Send Arguments:
+    if(argument[0] == 49){
+        strcpy(buffer,"DOWN");
+        cout << "Sending Server Shutdown command"<<endl;
+        if(write(data_socket,buffer, sizeof(buffer)+1)<0){
+            perror("Error during Write");
+        }
+        stop = 1;
+    }
     while(!stop){
+        //Generate Fake Data to Send across the Socket
         for(int i = 0; i<sizeof(buffer)-1;i++){
             int num = rand()%10+1;
             buffer[i] = (char)num;
         }
+        //Write Data Across
         if(write(data_socket,buffer, sizeof(buffer)+1)<0){
             perror("Error during Write");
         }
+
+        //Namaste, give that a break
         usleep(1000);
     }
 
@@ -62,16 +78,6 @@ int main() {
         perror("Error during Write");
         exit(EXIT_FAILURE);
     }
-
-    //Receieve Result:
-    if(read(data_socket,buffer,sizeof(buffer))<0){
-        perror("Error during read");
-        exit(EXIT_FAILURE);
-    }
-
-    buffer[sizeof(buffer)-1] = 0;
-
-    printf("Result = %s\n",buffer);
 
     close(data_socket);
     exit(EXIT_SUCCESS);
