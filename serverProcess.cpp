@@ -70,13 +70,25 @@ int main() {
             if(!strncmp(buffer, "END",sizeof(buffer))){
                 break;
             }
+
+            //Check to see if we need to shutdown the server...
             if(!strncmp(buffer,"DOWN",sizeof(buffer))){
                 downFlag = true;
                 break;
             }
-            for(unsigned char i:buffer){
+            //Check Data
+            for(char i:buffer){
                 printf("%d\t",(int)buffer[i]);
             }
+
+
+            //Inform Client of Data Integrity:
+//            memset(buffer,0,sizeof(buffer));
+//            buffer[0] = 1;
+            if(write(data_socket,buffer, sizeof(buffer)+1)<0){
+                perror("Error during Write");
+            }
+
             cout << endl;
         }
         if(downFlag){

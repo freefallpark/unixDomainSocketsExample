@@ -28,6 +28,8 @@ int main(int argc, char *argv[]) {
     size_t ret;
     int data_socket;
     char buffer[BUFFSIZE];
+    char bufferSent[BUFFSIZE];
+    int bufCheck;
     bzero(buffer, BUFFSIZE);
     //Create local socket:
     if((data_socket = socket(AF_UNIX,SOCK_SEQPACKET,0))<0){
@@ -61,15 +63,31 @@ int main(int argc, char *argv[]) {
             int num = rand()%10+1;
             buffer[i] = (char)num;
         }
+        memcpy(bufferSent, buffer, sizeof(bufferSent));
         //Write Data Across
-        if(write(data_socket,buffer, sizeof(buffer)+1)<0){
+        if(write(data_socket,buffer, sizeof(buffer))<0){
             perror("Error during Write");
         }
+
+        //Wait for Reply
+        if(read(data_socket,buffer,sizeof(buffer))<0){
+            perror("Error during read");
+        }
+        // Confirm what we sent is what they got...
+        for(int i = 0; i<sizeof(buffer);i++){
+            bufCheck = buffer[i]-bufferSent[i];
+            printf("%d\t",bufCheck);
+            if(bufCheck!=0){
+                cout <<"\nWARNING, data sent to Server was different that data recieved!"<<endl;
+                stop = 1;
+            }
+        }
+        cout << '\n';
 
         //Namaste, give that a break
         usleep(1000);
     }
-
+    cout <<'\n';
     //Request Send end command to server:
     bzero(buffer,BUFFSIZE);
 
