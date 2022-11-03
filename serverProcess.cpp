@@ -26,9 +26,12 @@ int main() {
     //Variable Instance Creation:
     sockaddr_un name{}; // Stores PATH Name and connection Family
     int connection_socket,data_socket; // These are the file descriptors for the connection socket and the client socket
-    unsigned char bufOut[BUFFSIZE]; // created in 'connection.h'
-    unsigned char  bufIn[BUFFSIZE];
-    int dsm, gpu, hand;
+    unsigned char bufOut[BUFFSIZE]; // Buffer for outgoing data
+    unsigned char  bufIn[BUFFSIZE]; // Buffer for incoming data. I decided to separate these because it makes it easy to
+                                    // debug because I can zero the bufIn before reading watch the data as its filled.
+                                    // Zeroring the buffer was causing some issues because it would alter the settings
+                                    // (eg indicate to the client that the surver turned off when it didn't.
+    int dsm, gpu, hand; // Variables used to bring in settings. from the client.
     // Create Local Socket...
     if((connection_socket = socket(AF_UNIX,SOCK_SEQPACKET,0))<0){
         perror("Error Creating Connection Socket");
@@ -56,6 +59,7 @@ int main() {
         perror("Error listening for connections");
         exit(EXIT_FAILURE);
     }
+    //Create necessary var for polling the connection_socket (accept is blocking so i hid it behind an if statement poll() call)
     pollfd poll4Client{};
     poll4Client.fd = connection_socket;
     poll4Client.events = POLL_IN;
@@ -73,20 +77,22 @@ int main() {
             if(read(data_socket, bufIn, BUFFSIZE) < 0){
                 perror("Error during read");
             }
-            // Write Modes/settings:
+            // Read in settings for FPC:
             dsm  = bufIn[2];
             gpu  = bufIn[3];
             hand = bufIn[4];
             cout << "Settings Read from Client..."<< endl;
-            //Start up FPC with settings:
+            cout << "Connecting to FPC and sending data across the wire!"<<endl;
+            //Initialize FPC with settings given to by client:
             //TODO: FPC FUNCTION Setup goes here
-            srand(time(nullptr));
+            srand(time(nullptr)); // TEMPORARY
+            //Send FPC Data across the wire in this loop!
             while(!stop){
                 // Get New Pose data:
-                int rNum = rand() % 10;
-                //TODO: FPC if data ready, update data and send...
-                // else do nothing until data is ready...
-                float x = (float)69.4200*(float)rNum; float y = (float)69.4200 * (float)rNum; float z = (float)69.4200 * (float)rNum;
+                int rNum = 1; //rand() % 10;
+                //TODO: FPC if (data ready){update Pose Array... and Send across the wire}
+                // else {do nothing until data is ready...}
+                float x = (float)-69.4200*(float)rNum; float y = (float)69.4200 * (float)rNum; float z = (float)69.4200 * (float)rNum;
                 float r = (float)4.2069*(float)rNum; float p = (float)4.2069*(float)rNum; float yaw = (float)4.2069*(float)rNum;
                 float pose[6] = {x, y, z, r, p, yaw};
                 // Covert to Int but preserve decimals:
@@ -94,6 +100,7 @@ int main() {
                     pose[i] = pose[i] * XYZ_CONVERT;
                     pose[i + 3] = pose[i + 3] * RPY_CONVERT;
                 }
+                // Shift right to create 3Byte Char Array
                 for (int i = 1; i<7; i++ ) {// ASSUMES 24BIT signals!
                     int j = 3*i+2;
                     rightShift((int) pose[i - 1], &bufOut[j], twentyFour);
@@ -126,7 +133,7 @@ int main() {
             }
         }
     }
-    //IF Server is shutting down...
+    //IF Server is shutting down Inform the Client (if its on!)...
     if(bufIn[0]){ //IF client is on we need to turn it off.
         printf("\nServer Powering Off. Informing Client...\n");
         bzero(bufOut, sizeof(bufOut));
@@ -136,9 +143,10 @@ int main() {
             }
     }
 
-    //close socket
+    //close sockets
     close(data_socket);
     close(connection_socket);
+    //Unlink Path so we don't run into any binding issues in future.
     unlink(PATH);
     printf("\nServer Shutdown Complete\n");
     exit(EXIT_SUCCESS);

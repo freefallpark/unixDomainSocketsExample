@@ -22,6 +22,7 @@ void rightShift(int argIn, unsigned char *argOut, numBits bits){
         }
         printf("rightShift(): Warning surpassed boundary of %d bit signal... Saturating to %d", bits, argIn);
     }
+    // Probably don't need this but I wanted to see if I could do it.
     switch(bits){
         case twentyFour:
             bytes[0] = (argIn >> 16) & 0xFF;
@@ -35,12 +36,15 @@ void rightShift(int argIn, unsigned char *argOut, numBits bits){
             bytes[3] = (argIn >>  0) & 0xFF;
             break;
     }
+    // Copy data to argOut.
     memcpy(argOut, bytes, sizeof(bytes));
 }
 
 int leftShift(const unsigned char *argIn, numBits bits){
     int argOut;
-    switch(bits){                       //Assumes Positive... we'll negate if needed in the next step.
+    //Probably ddon't need to do this but I wanted to see if I could...
+    //Assumes Positive... we'll negate if needed in the next step.
+    switch(bits){
         case twentyFour:
             argOut = (argIn[0] << 16) | (argIn[1] << 8) | (argIn[2]);
             break;
@@ -48,7 +52,8 @@ int leftShift(const unsigned char *argIn, numBits bits){
             argOut = (argIn[0] << 24) | (argIn[1] << 16) | (argIn[2]) << 8 | (argIn[3]);
             break;
     }
-    if((int)argIn[0] > 127){            // Number will be negative!
+    // Number will turn negative if it enters this loop (i.e. the first bit is a 1)
+    if((int)argIn[0] > 127){
         argOut = argOut - 16777216;
     }
     return argOut;
