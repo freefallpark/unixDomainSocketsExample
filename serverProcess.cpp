@@ -9,6 +9,7 @@
 #include <sys/un.h>
 #include <mutex>
 #include "connection.h"
+#include "converters.h"
 #include <poll.h>
 
 using namespace std;
@@ -74,13 +75,30 @@ int main() {
             downFlag =1; //Client is connected!
             srand(time(nullptr));
             while(!stop){
-                //Generate Fake Data to Send across the Socket
+                // Get New Pose data:
+                float x = 69.4200; float y = 69.4200; float z = 69.4200;
+                float r = 4.2069; float p = 4.2069; float yaw = 4.2069;
+                float pose[6] = {x, y, z, r, p, yaw};
+                //Package Pose Data in Buffer:
+                for(int i = 0; i<3;i++){
+                    pose[i] = pose[i] * XYZ_CONVERT;
+                    pose[i+3] = pose[i+3]*RPY_CONVERT;
+                }
+                memset(buffer,1, sizeof(buffer));
+                buffer[sizeof(buffer) -1] = 0;
+                int bytesPerSig = 3;
+                for (int i = 1; i<7; i++ ) {
+                    int j = bytesPerSig*i-bytesPerSig+5;
+                    rightShift((int) pose[i-1], &buffer[j], twentyFour);
+                }
+                //Package Settings Data:
+                buffer[0] = 1; // Server is On!
+                buffer[1] = 0; // No Errors to report!
+                buffer[2] = 1; // RGBD!;
+                buffer[3] = 0; // GPU OFF!;
+                buffer[4] = 0; //Handedness off!
+                //Save local copy of buffer for integrity check:
                 char bufferSent[BUFFSIZE]; int bufCheck;
-                buffer[0] = 0; // first byte is Client/Server communication
-                for(int i = 1; i<sizeof(buffer)-1;i++){
-                    int num = rand()%10+1;
-                    buffer[i] = (char)num;
-                }//
                 memcpy(bufferSent, buffer, sizeof(bufferSent));
                 //Write Data Across Socket:
                 if(write(data_socket,buffer, sizeof(buffer))<0){

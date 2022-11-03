@@ -6,33 +6,61 @@
 #include "converters.h"
 #include <cstdlib>
 #include <cstdio>
+#include <string>
 
-/// Splits 24bit Int into x3 8 bits
-void rightShift24(int argIn, unsigned char *buffer){
-    unsigned char bytes[3];
-    if(abs(argIn) > 8388607){
-        printf("Warning surpassed boundary of 24bit signal... Saturating to max allowed value");
+void rightShift(int argIn, char *argOut, numBits bits){
+    unsigned char bytes[bits/8];
+    int maxSignedInt = ((2^bits)/2)-1;
+    //Saturate incoming Values that are too big and warn the user
+    if(abs(argIn) > maxSignedInt){
         if(argIn < 0){
-            argIn = -8388607;
+            argIn = -1*maxSignedInt;
         }
         else{
-            argIn = 8388607;
+            argIn = maxSignedInt;
         }
+        printf("rightShift(): Warning surpassed boundary of %d bit signal... Saturating to %d", bits, argIn);
     }
-    bytes[0] = (argIn >> 16) & 0xFF;
-    bytes[1] = (argIn >> 8) & 0xFF;
-    bytes[2] = (argIn >>  0) & 0xFF;
-    memcpy(buffer, bytes, sizeof(bytes));
+    switch(bits){
+        case twentyFour:
+            bytes[0] = (argIn >> 16) & 0xFF;
+            bytes[1] = (argIn >>  8) & 0xFF;
+            bytes[2] = (argIn >>  0) & 0xFF;
+            break;
+        case thirtyTwo:
+            bytes[0] = (argIn >> 24) & 0xFF;
+            bytes[1] = (argIn >> 16) & 0xFF;
+            bytes[2] = (argIn >>  8) & 0xFF;
+            bytes[3] = (argIn >>  0) & 0xFF;
+            break;
+    }
+    memcpy(argOut, bytes, sizeof(bytes));
 }
-/// turns 3 byte signal into int
-int leftShift24(const unsigned char *buffer){
-    int argOut;
-    if((int)buffer[0]>127){
-        argOut = ((buffer[0] << 16) | (buffer[1] << 8) | (buffer[2]))-16777216;
 
+int leftShift(const char *argIn, numBits bits){
+    int argOut;
+    switch(bits){                       //Assumes Positive... we'll negate if needed in the next step.
+        case twentyFour:
+            argOut = (argIn[0] << 16) | (argIn[1] << 8) | (argIn[2]);
+            break;
+        case thirtyTwo:
+            argOut = (argIn[0] << 24) | (argIn[1] << 16) | (argIn[2]) << 8 | (argIn[3]);
+            break;
     }
-    else{
-        argOut = ((buffer[0] << 16) | (buffer[1] << 8) | (buffer[2]));
+    if((int)argIn[0] > 127){            // Number will be negative!
+        argOut = argOut - 16777216;
     }
     return argOut;
 }
+
+void floatToSignal(float pose[6], char buffer[25]){
+    int bytesPerSig = 3;
+    for(int i = 1; i < bytesPerSig; i++){
+        int j = bytesPerSig*i-bytesPerSig + 5;
+        rightShift((int)pose[i-1], &buffer[j], twentyFour);
+    }
+}
+
+
+
+
