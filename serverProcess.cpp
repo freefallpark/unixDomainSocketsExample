@@ -26,11 +26,9 @@ int main() {
     //Variable Instance Creation:
     sockaddr_un name{}; // Stores PATH Name and connection Family
     int connection_socket,data_socket; // These are the file descriptors for the connection socket and the client socket
-    char buffer[BUFFSIZE]; // created in 'connection.h'
-    int downFlag = 0; // This will help us shut down the server. its trigger by the client sending "DOWN" across the Socket.
-            // 0 indicates client is NOT connected.
-            // 1 indicates client IS connected
-            // 2 indicates client is telling server to shutdown
+    unsigned char bufOut[BUFFSIZE]; // created in 'connection.h'
+    unsigned char  bufIn[BUFFSIZE];
+    int dsm, gpu, hand;
     // Create Local Socket...
     if((connection_socket = socket(AF_UNIX,SOCK_SEQPACKET,0))<0){
         perror("Error Creating Connection Socket");
@@ -63,7 +61,6 @@ int main() {
     poll4Client.events = POLL_IN;
     while(!stop){
         //Wait for incoming connections:
-        downFlag = 0; // no clients connected.
         //Polling allows us to keep looping through (and checking for !stop)
         if(poll(&poll4Client,(nfds_t)1,(int)500)>0){
             if((data_socket = accept(connection_socket, nullptr, nullptr))<0){
@@ -71,85 +68,74 @@ int main() {
                 exit(EXIT_FAILURE);
             }
             cout << "Client Found and Connection Accepted"<<endl;
-            //Once we've found a connection: In the future. might be a good idea to handle this with threading.. i *think* we'll need a new thread for each client
-            downFlag =1; //Client is connected!
+            cout << "Reading in Settings from Client"<<endl;
+            bzero(bufIn,sizeof(bufIn));
+            if(read(data_socket, bufIn, BUFFSIZE) < 0){
+                perror("Error during read");
+            }
+            // Write Modes/settings:
+            dsm  = bufIn[2];
+            gpu  = bufIn[3];
+            hand = bufIn[4];
+            cout << "Settings Read from Client..."<< endl;
+            //Start up FPC with settings:
+            //TODO: FPC FUNCTION Setup goes here
             srand(time(nullptr));
             while(!stop){
                 // Get New Pose data:
-                float x = 69.4200; float y = 69.4200; float z = 69.4200;
-                float r = 4.2069; float p = 4.2069; float yaw = 4.2069;
+                int rNum = rand() % 10;
+                //TODO: FPC if data ready, update data and send...
+                // else do nothing until data is ready...
+                float x = (float)69.4200*(float)rNum; float y = (float)69.4200 * (float)rNum; float z = (float)69.4200 * (float)rNum;
+                float r = (float)4.2069*(float)rNum; float p = (float)4.2069*(float)rNum; float yaw = (float)4.2069*(float)rNum;
                 float pose[6] = {x, y, z, r, p, yaw};
-                //Package Pose Data in Buffer:
+
+                cout << pose[0]<<endl;
+                // Covert to Int but preserve decimals:
                 for(int i = 0; i<3;i++){
                     pose[i] = pose[i] * XYZ_CONVERT;
-                    pose[i+3] = pose[i+3]*RPY_CONVERT;
+                    pose[i + 3] = pose[i + 3] * RPY_CONVERT;
                 }
-                memset(buffer,1, sizeof(buffer));
-                buffer[sizeof(buffer) -1] = 0;
-                int bytesPerSig = 3;
-                for (int i = 1; i<7; i++ ) {
-                    int j = bytesPerSig*i-bytesPerSig+5;
-                    rightShift((int) pose[i-1], &buffer[j], twentyFour);
+                for (int i = 1; i<7; i++ ) {// ASSUMES 24BIT signals!
+                    int j = 3*i+2;
+                    rightShift((int) pose[i - 1], &bufOut[j], twentyFour);
                 }
-                //Package Settings Data:
-                buffer[0] = 1; // Server is On!
-                buffer[1] = 0; // No Errors to report!
-                buffer[2] = 1; // RGBD!;
-                buffer[3] = 0; // GPU OFF!;
-                buffer[4] = 0; //Handedness off!
-                //Save local copy of buffer for integrity check:
-                char bufferSent[BUFFSIZE]; int bufCheck;
-                memcpy(bufferSent, buffer, sizeof(bufferSent));
                 //Write Data Across Socket:
-                if(write(data_socket,buffer, sizeof(buffer))<0){
+                if(write(data_socket, bufOut, BUFFSIZE) < 0){
                     perror("Error during Write");
                 }
                 //Read Response from Client:
-                bzero(buffer,sizeof(buffer));
-                if(read(data_socket,buffer,sizeof(buffer))<0){
+                bzero(bufIn, sizeof(bufIn));
+                if(read(data_socket, bufIn, BUFFSIZE) < 0){
                     perror("Error during read");
                 }
-                //Check for shutdown or Close client command:
-                if(buffer[0]==2){
-                    downFlag = 2; //client is telling us to turn off!
+                //Check to see if client closed down!
+                if(!bufIn[0]){ // Client Turned off disconnect from client!
+                    cout << "Client powered off. Stopping Data Transfer..."<<endl;
                     break;
                 }
-                else if(buffer[0] ==1){
-                    cout << "Listening for Clients again..." <<endl;
-                    break;
-                }
-                else{
-                    //CheckData:
-                    // Confirm what we sent is what they got...
-                    for(int i = 0; i<sizeof(buffer);i++){
-                        bufCheck = buffer[i]-bufferSent[i];
-                        if(bufCheck!=0){
-                            printf("Difference: %d\tIndex:%d\n",bufCheck,i);
-                            cout <<"\nWARNING, data sent to Client was different than data recieved!"<<endl;
-                            stop = 1;
-                        }
+                //Check to see if client had any errors!
+                if(!bufIn[1]){
+                    switch(bufOut[1]){
+                        case(1):
+                            printf("Error Code 1: Client experienced *this* error");
+                            //TODO: need to think about potential errors client would need to inform server about
+                            break;
+                        default:
+                            break;
                     }
                 }
-
             }
         }
-
-        if(downFlag == 2){
-            //if downflag is raised. the client is telling the server to shutdown...
-            //becaues the client is aware already, we shouldn't write to the client.
-            //i.e. do nothing!
-            break;
-        }
     }
-
-    if(downFlag == 1 && stop){
-        //if the down flag isn't raised the server needs to tell the client to shutdown!
-        bzero(buffer,sizeof(buffer));
-        buffer[0] = 2; //inform client to turn off.
-        if(write(data_socket,buffer, sizeof(buffer))<0){
-            perror("Error during Write");
-        }
-
+    //IF Server is shutting down...
+    if(bufIn[0]){ //IF client is on we need to turn it off.
+        printf("\nServer Powering Off. Informing Client...\n");
+        bzero(bufOut, sizeof(bufOut));
+        bufOut[0] = 0; //inform client to turn off.
+        if(write(data_socket, bufOut, BUFFSIZE) < 0){
+                perror("Error during Write");
+            }
     }
 
     //close socket

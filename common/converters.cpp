@@ -7,10 +7,11 @@
 #include <cstdlib>
 #include <cstdio>
 #include <string>
+#include <valarray>
 
-void rightShift(int argIn, char *argOut, numBits bits){
+void rightShift(int argIn, unsigned char *argOut, numBits bits){
     unsigned char bytes[bits/8];
-    int maxSignedInt = ((2^bits)/2)-1;
+    int maxSignedInt = ((int)pow(2,bits)/2)-1;
     //Saturate incoming Values that are too big and warn the user
     if(abs(argIn) > maxSignedInt){
         if(argIn < 0){
@@ -37,7 +38,7 @@ void rightShift(int argIn, char *argOut, numBits bits){
     memcpy(argOut, bytes, sizeof(bytes));
 }
 
-int leftShift(const char *argIn, numBits bits){
+int leftShift(const unsigned char *argIn, numBits bits){
     int argOut;
     switch(bits){                       //Assumes Positive... we'll negate if needed in the next step.
         case twentyFour:
@@ -53,13 +54,7 @@ int leftShift(const char *argIn, numBits bits){
     return argOut;
 }
 
-void floatToSignal(float pose[6], char buffer[25]){
-    int bytesPerSig = 3;
-    for(int i = 1; i < bytesPerSig; i++){
-        int j = bytesPerSig*i-bytesPerSig + 5;
-        rightShift((int)pose[i-1], &buffer[j], twentyFour);
-    }
-}
+
 
 
 

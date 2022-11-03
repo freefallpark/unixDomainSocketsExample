@@ -15,13 +15,13 @@ enum numBits{twentyFour = 24,thirtyTwo = 32};
 /// @brief  RightShift: Takes an int and converts it to a n bit signal of your choice between 24 and 32 converted value is a char[numbits/8].
 /// @note   your input Int can't be larger than +-((2^n)/2)-1;
 /// @note   Assumes Big Endianness
-void rightShift(int argIn, char *argOut, numBits bits);
+void rightShift(int argIn, unsigned char *argOut, numBits bits);
 
 
 /// @brief  LeftShift: Takes a char[numbits/8] and outputs the signed int that char represents.
 /// @note   argIn must be 3 or 4 bytes (twentyFour or thirtyTwo bits).
 /// @note   Assumes Big Endianness
-int leftShift(const char *argIn, numBits bits);
+int leftShift(const unsigned char *argIn, numBits bits);
 
 
 /// @brief floatToSignal(): Inputs pose data and packages it into a buffer.
