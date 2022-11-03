@@ -89,8 +89,6 @@ int main() {
                 float x = (float)69.4200*(float)rNum; float y = (float)69.4200 * (float)rNum; float z = (float)69.4200 * (float)rNum;
                 float r = (float)4.2069*(float)rNum; float p = (float)4.2069*(float)rNum; float yaw = (float)4.2069*(float)rNum;
                 float pose[6] = {x, y, z, r, p, yaw};
-
-                cout << pose[0]<<endl;
                 // Covert to Int but preserve decimals:
                 for(int i = 0; i<3;i++){
                     pose[i] = pose[i] * XYZ_CONVERT;

@@ -115,15 +115,12 @@ int main() {
     }
     cout <<'\n';
     //Inform Server, client is shutting down (but the server should stay up)
-    bzero(buffOut, BUFFSIZE);
     buffOut[0] = 0;
     if(write(data_socket, buffOut, BUFFSIZE) < 0){
         perror("Error during Write");
         exit(EXIT_FAILURE);
     }
     usleep(1000);
-
-
     close(data_socket);
     exit(EXIT_SUCCESS);
 }
